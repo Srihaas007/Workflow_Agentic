@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box } from '@mui/material';
 import { QueryClient, QueryClientProvider } from 'react-query';
@@ -15,6 +15,14 @@ import APIHub from './pages/APIHub';
 import WorkflowAdvisor from './pages/WorkflowAdvisor';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
+
+// Auth Pages
+import Login from './pages/auth/Login';
+import SignUp from './pages/auth/SignUp';
+import ForgotPassword from './pages/auth/ForgotPassword';
+
+const drawerWidth = 280;
+const collapsedWidth = 64;
 
 // Create dark theme inspired by your existing patterns
 const darkTheme = createTheme({
@@ -91,15 +99,52 @@ const queryClient = new QueryClient({
 });
 
 function App() {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false); // Set to false for proper auth flow
+
+  const handleSidebarToggle = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  // If not authenticated, show auth routes
+  if (!isAuthenticated) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={darkTheme}>
+          <CssBaseline />
+          <Router>
+            <Routes>
+              <Route path="/login" element={<Login onLogin={() => setIsAuthenticated(true)} />} />
+              <Route path="/signup" element={<SignUp />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="*" element={<Navigate to="/login" replace />} />
+            </Routes>
+          </Router>
+        </ThemeProvider>
+      </QueryClientProvider>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={darkTheme}>
         <CssBaseline />
         <Router>
           <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0a0e1a' }}>
-            <Sidebar />
-            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-              <Header />
+            <Sidebar open={sidebarOpen} onToggle={handleSidebarToggle} />
+            <Box 
+              sx={{ 
+                flexGrow: 1, 
+                display: 'flex', 
+                flexDirection: 'column',
+                width: `calc(100% - ${sidebarOpen ? drawerWidth : collapsedWidth}px)`,
+                transition: darkTheme.transitions.create('width', {
+                  easing: darkTheme.transitions.easing.sharp,
+                  duration: darkTheme.transitions.duration.enteringScreen,
+                }),
+              }}
+            >
+              <Header onLogout={() => setIsAuthenticated(false)} />
               <Box 
                 component="main" 
                 sx={{ 
@@ -110,15 +155,18 @@ function App() {
                 }}
               >
                 <Routes>
-                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/workflow-builder" element={<WorkflowBuilder />} />
+                  <Route path="/workflows" element={<WorkflowBuilder />} />
+                  <Route path="/workflow-templates" element={<WorkflowBuilder />} />
                   <Route path="/email-automation" element={<EmailAutomation />} />
                   <Route path="/task-scheduler" element={<TaskScheduler />} />
                   <Route path="/api-hub" element={<APIHub />} />
                   <Route path="/workflow-advisor" element={<WorkflowAdvisor />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
               </Box>
             </Box>

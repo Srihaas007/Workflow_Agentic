@@ -19,7 +19,11 @@ import {
   Person as PersonIcon
 } from '@mui/icons-material';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  onLogout?: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ onLogout }) => {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
   const handleProfileClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -28,6 +32,13 @@ const Header: React.FC = () => {
 
   const handleClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleLogout = () => {
+    handleClose();
+    if (onLogout) {
+      onLogout();
+    }
   };
 
   return (
@@ -117,7 +128,7 @@ const Header: React.FC = () => {
               <SettingsIcon sx={{ mr: 2, fontSize: 20 }} />
               Settings
             </MenuItem>
-            <MenuItem onClick={handleClose} sx={{ color: '#ff6b35' }}>
+            <MenuItem onClick={handleLogout} sx={{ color: '#ff6b35' }}>
               <LogoutIcon sx={{ mr: 2, fontSize: 20 }} />
               Logout
             </MenuItem>
