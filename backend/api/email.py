@@ -10,13 +10,13 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field, EmailStr
 import logging
 
-from ..ai_engine.email_ai import EmailAI
-from ..database import get_db
-from ..security import get_current_user
+from backend.ai_engine.email_ai import EmailAI
+from backend.core.database import get_db
+from backend.core.security import get_current_user
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/email", tags=["email"])
+router = APIRouter(tags=["email"])
 
 # Initialize AI engine
 email_ai = EmailAI()

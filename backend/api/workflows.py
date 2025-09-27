@@ -10,13 +10,13 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 import logging
 
-from ..ai_engine.workflow_ai import WorkflowAI
-from ..database import get_db
-from ..security import get_current_user
+from backend.ai_engine.workflow_ai import WorkflowAI
+from backend.core.database import get_db
+from backend.core.security import get_current_user
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/workflows", tags=["workflows"])
+router = APIRouter(tags=["workflows"])
 
 # Initialize AI engine
 workflow_ai = WorkflowAI()

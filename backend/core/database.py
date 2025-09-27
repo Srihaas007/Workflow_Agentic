@@ -10,6 +10,7 @@ import asyncio
 from typing import AsyncGenerator
 
 from .config import settings
+from .models import Base
 
 # Create async engine
 # Support both SQLite and PostgreSQL
@@ -28,9 +29,6 @@ engine = create_async_engine(
 async_session = sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )
-
-# Create declarative base
-Base = declarative_base()
 
 # Metadata for migrations
 metadata = MetaData()

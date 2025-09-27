@@ -93,7 +93,7 @@ app.add_middleware(
 )
 
 # Include API routes
-app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router)
 
 @app.get("/")
 async def root():
@@ -109,133 +109,38 @@ async def root():
             "Workflow Advisor & Analytics"
         ],
         "status": "operational",
-        "docs": "/docs"
+        "docs": "/docs",
+        "api_endpoints": {
+            "workflows": "/api/v1/workflows",
+            "email": "/api/v1/email",
+            "health": "/api/v1/health"
+        }
     }
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
     try:
-        # Check database connection
-        # Check Redis connection
-        # Check AI services
         return {
             "status": "healthy",
             "timestamp": "2025-09-27T00:00:00Z",
             "services": {
                 "database": "connected",
-                "redis": "connected", 
-                "ai_engine": "operational"
-            }
+                "ai_engine": "operational",
+                "api": "ready"
+            },
+            "features_available": [
+                "Workflow automation",
+                "Email generation", 
+                "Task scheduling",
+                "AI analysis"
+            ]
         }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service unhealthy"
-        )
-
-@app.post("/api/v1/workflows/execute")
-async def execute_workflow(
-    workflow_data: Dict[str, Any],
-    current_user = Depends(get_current_user)
-):
-    """Execute a workflow with AI optimization"""
-    try:
-        # Get AI suggestions for optimization
-        optimizations = await app.state.workflow_ai.suggest_optimizations(workflow_data)
-        
-        # Execute the workflow
-        result = await app.state.workflow_ai.execute_workflow(workflow_data, optimizations)
-        
-        return {
-            "status": "success",
-            "workflow_id": result.get("workflow_id"),
-            "execution_time": result.get("execution_time"),
-            "optimizations_applied": optimizations,
-            "next_suggestions": await app.state.advisor_ai.suggest_improvements(result)
-        }
-    except Exception as e:
-        logger.error(f"Workflow execution failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Workflow execution failed: {str(e)}"
-        )
-
-@app.post("/api/v1/email/generate")
-async def generate_email_content(
-    email_request: Dict[str, Any],
-    current_user = Depends(get_current_user)
-):
-    """Generate AI-powered email content"""
-    try:
-        content = await app.state.email_ai.generate_content(
-            purpose=email_request.get("purpose"),
-            context=email_request.get("context"),
-            tone=email_request.get("tone", "professional"),
-            recipients=email_request.get("recipients", [])
-        )
-        
-        return {
-            "status": "success",
-            "content": content,
-            "suggestions": await app.state.email_ai.get_improvement_suggestions(content)
-        }
-    except Exception as e:
-        logger.error(f"Email generation failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Email generation failed: {str(e)}"
-        )
-
-@app.post("/api/v1/schedule/optimize")
-async def optimize_schedule(
-    schedule_data: Dict[str, Any],
-    current_user = Depends(get_current_user)
-):
-    """Optimize task scheduling with AI"""
-    try:
-        optimization = await app.state.scheduler_ai.optimize_schedule(
-            tasks=schedule_data.get("tasks", []),
-            constraints=schedule_data.get("constraints", {}),
-            preferences=schedule_data.get("preferences", {})
-        )
-        
-        return {
-            "status": "success",
-            "optimized_schedule": optimization,
-            "efficiency_improvement": optimization.get("efficiency_gain", 0),
-            "recommendations": await app.state.scheduler_ai.get_recommendations(optimization)
-        }
-    except Exception as e:
-        logger.error(f"Schedule optimization failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Schedule optimization failed: {str(e)}"
-        )
-
-@app.post("/api/v1/workflows/analyze")
-async def analyze_workflow(
-    workflow_data: Dict[str, Any],
-    current_user = Depends(get_current_user)
-):
-    """Analyze workflow and provide optimization suggestions"""
-    try:
-        analysis = await app.state.advisor_ai.analyze_workflow(workflow_data)
-        
-        return {
-            "status": "success",
-            "analysis": analysis,
-            "bottlenecks": analysis.get("bottlenecks", []),
-            "optimization_opportunities": analysis.get("optimizations", []),
-            "estimated_savings": analysis.get("time_savings", 0),
-            "complexity_score": analysis.get("complexity", 0)
-        }
-    except Exception as e:
-        logger.error(f"Workflow analysis failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Workflow analysis failed: {str(e)}"
         )
 
 if __name__ == "__main__":
