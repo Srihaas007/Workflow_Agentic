@@ -127,6 +127,35 @@ class UserPreferenceUpdate(BaseSchema):
     dashboard_layout: Optional[Dict[str, Any]] = None
 
 # Authentication Schemas
+class UserLogin(BaseSchema):
+    """Schema for user login"""
+    email_or_username: str = Field(..., description="Email or username")
+    password: str = Field(..., description="Password")
+    remember_me: bool = Field(False, description="Remember login session")
+
+class Token(BaseSchema):
+    """Schema for authentication token"""
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user: UserResponse
+
+class PasswordResetRequest(BaseSchema):
+    """Schema for password reset request"""
+    email: EmailStr = Field(..., description="Email address for password reset")
+
+class PasswordReset(BaseSchema):
+    """Schema for password reset"""
+    token: str = Field(..., description="Password reset token")
+    new_password: str = Field(..., min_length=8, description="New password")
+    confirm_password: str = Field(..., description="Confirm new password")
+    
+    @validator('confirm_password')
+    def passwords_match(cls, v, values, **kwargs):
+        if 'password' in values and v != values['new_password']:
+            raise ValueError('Passwords do not match')
+        return v
+
 class LoginRequest(BaseSchema):
     """Schema for login request"""
     username: str = Field(..., description="Username or email")
