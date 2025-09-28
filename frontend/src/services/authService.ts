@@ -56,13 +56,20 @@ export interface PasswordReset {
 class AuthService {
   private tokenKey = 'auth_token';
   private userKey = 'auth_user';
+  private axiosInstance;
 
-  // Configure axios defaults
+  // Configure axios instance with proper settings
   constructor() {
-    axios.defaults.baseURL = API_BASE_URL;
+    this.axiosInstance = axios.create({
+      baseURL: API_BASE_URL,
+      timeout: 10000, // 10 second timeout
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
     
     // Add token to all requests if available
-    axios.interceptors.request.use(
+    this.axiosInstance.interceptors.request.use(
       (config) => {
         const token = this.getToken();
         if (token) {
@@ -76,7 +83,7 @@ class AuthService {
     );
 
     // Handle token expiration
-    axios.interceptors.response.use(
+    this.axiosInstance.interceptors.response.use(
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
@@ -90,22 +97,37 @@ class AuthService {
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const response = await axios.post<AuthResponse>('/auth/login', credentials);
+      console.log('🔐 Attempting login with:', { email: credentials.email_or_username });
+      const response = await this.axiosInstance.post<AuthResponse>('/auth/login', credentials);
       const { access_token, user } = response.data;
       
       // Store token and user data
       localStorage.setItem(this.tokenKey, access_token);
       localStorage.setItem(this.userKey, JSON.stringify(user));
       
+      console.log('✅ Login successful for user:', user.email);
       return response.data;
     } catch (error: any) {
-      throw this.handleError(error);
+      console.error('❌ Login failed:', error);
+      
+      // Better error handling
+      if (error.code === 'ECONNREFUSED' || error.code === 'NETWORK_ERROR') {
+        throw new Error('Cannot connect to server. Please check if the backend is running.');
+      } else if (error.response?.status === 401) {
+        throw new Error('Invalid credentials. Please check your email and password.');
+      } else if (error.response?.status === 429) {
+        throw new Error('Too many login attempts. Please try again later.');
+      } else if (error.response?.data?.detail) {
+        throw new Error(error.response.data.detail);
+      } else {
+        throw new Error(`Login failed: ${error.message || 'Unknown error'}`);
+      }
     }
   }
 
   async register(userData: RegisterData): Promise<User> {
     try {
-      const response = await axios.post<User>('/auth/register', userData);
+      const response = await this.axiosInstance.post<User>('/auth/register', userData);
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -114,7 +136,7 @@ class AuthService {
 
   async logout(): Promise<void> {
     try {
-      await axios.post('/auth/logout');
+      await this.axiosInstance.post('/auth/logout');
     } catch (error) {
       // Continue with logout even if API call fails
       console.warn('Logout API call failed:', error);
@@ -127,7 +149,7 @@ class AuthService {
 
   async getCurrentUser(): Promise<User> {
     try {
-      const response = await axios.get<User>('/auth/me');
+      const response = await this.axiosInstance.get<User>('/auth/me');
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -136,7 +158,7 @@ class AuthService {
 
   async requestPasswordReset(data: PasswordResetRequest): Promise<void> {
     try {
-      await axios.post('/auth/forgot-password', data);
+      await this.axiosInstance.post('/auth/forgot-password', data);
     } catch (error: any) {
       throw this.handleError(error);
     }
@@ -144,7 +166,7 @@ class AuthService {
 
   async resetPassword(data: PasswordReset): Promise<void> {
     try {
-      await axios.post('/auth/reset-password', data);
+      await this.axiosInstance.post('/auth/reset-password', data);
     } catch (error: any) {
       throw this.handleError(error);
     }
@@ -152,9 +174,12 @@ class AuthService {
 
   async getDemoCredentials(): Promise<any> {
     try {
-      const response = await axios.get('/auth/demo-credentials');
+      console.log('🎭 Fetching demo credentials...');
+      const response = await this.axiosInstance.get('/auth/demo-credentials');
+      console.log('✅ Demo credentials loaded:', response.data);
       return response.data;
     } catch (error: any) {
+      console.error('❌ Failed to fetch demo credentials:', error);
       throw this.handleError(error);
     }
   }
