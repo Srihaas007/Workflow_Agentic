@@ -1,6 +1,21 @@
 #!/usr/bin/env node
-/*
-  ddev.js — simple ddev-like orchestration for dev
+/*async function httpStatus(url, timeout = 10000) {
+  return new Promise(resolve => {
+    const req = http.get(url, { timeout }, res => {
+      resolve(res.statusCode);
+      res.resume();
+    });
+    req.on('timeout', () => { 
+      req.destroy(); 
+      console.error(`Timeout checking ${url}`);
+      resolve(null); 
+    });
+    req.on('error', (err) => {
+      console.error(`Error checking ${url}:`, err.message);
+      resolve(null);
+    });
+  });
+}s — simple ddev-like orchestration for dev
   Usage:
     node ddev.js start   # docker compose up -d + health checks
     node ddev.js stop    # docker compose down

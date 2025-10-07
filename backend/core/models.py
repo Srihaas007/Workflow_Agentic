@@ -74,8 +74,8 @@ class User(Base):
     timezone = Column(String(50), default='UTC', nullable=False)
     language = Column(String(10), default='en', nullable=False)
     profile_picture_url = Column(String(500), nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Constraints
     __table_args__ = (
@@ -96,7 +96,7 @@ class User(Base):
     audit_logs = relationship("AuditLog", back_populates="user", cascade="all, delete-orphan")
     
     @validates('email')
-    def validate_email_field(self, key, email):
+    def validate_email_field(self, _key, email):
         """Validate email format"""
         if not email:
             raise ValueError("Email is required")
@@ -107,7 +107,7 @@ class User(Base):
         return email
     
     @validates('username')
-    def validate_username(self, key, username):
+    def validate_username(self, _key, username):
         """Validate username format and length"""
         if not username:
             raise ValueError("Username is required")
@@ -121,7 +121,7 @@ class User(Base):
         return username
     
     @validates('timezone')
-    def validate_timezone(self, key, timezone):
+    def validate_timezone(self, _key, timezone):
         """Validate timezone format"""
         import pytz
         if timezone not in pytz.all_timezones:
@@ -148,8 +148,8 @@ class UserPreference(Base):
     security_notifications = Column(Boolean, default=True, nullable=False)
     weekly_reports = Column(Boolean, default=False, nullable=False)
     dashboard_layout = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Constraints
     __table_args__ = (
@@ -173,7 +173,7 @@ class APIKey(Base):
     usage_count = Column(Integer, default=0, nullable=False)
     rate_limit = Column(Integer, default=1000, nullable=False)  # Requests per hour
     expires_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Constraints
     __table_args__ = (
@@ -186,7 +186,7 @@ class APIKey(Base):
     owner = relationship("User", back_populates="api_keys")
     
     @validates('name')
-    def validate_name(self, key, name):
+    def validate_name(self, _key, name):
         """Validate API key name"""
         if not name or not name.strip():
             raise ValueError("API key name is required")
@@ -214,8 +214,8 @@ class Workflow(Base):
     failure_count = Column(Integer, default=0, nullable=False)
     average_duration = Column(Float, default=0.0, nullable=False)  # In seconds
     last_executed = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Constraints
     __table_args__ = (
@@ -234,7 +234,7 @@ class Workflow(Base):
     executions = relationship("WorkflowExecution", back_populates="workflow", cascade="all, delete-orphan")
     
     @validates('name')
-    def validate_name(self, key, name):
+    def validate_name(self, _key, name):
         """Validate workflow name"""
         if not name or not name.strip():
             raise ValueError("Workflow name is required")
@@ -244,7 +244,7 @@ class Workflow(Base):
         return name
     
     @validates('nodes', 'edges')
-    def validate_json_fields(self, key, value):
+    def validate_json_fields(self, _key, value):
         """Validate JSON fields"""
         if value is None:
             return [] if key in ['nodes', 'edges', 'tags'] else {}
@@ -252,7 +252,7 @@ class Workflow(Base):
             try:
                 return json.loads(value)
             except json.JSONDecodeError:
-                raise ValueError(f"Invalid JSON format for {key}")
+                raise ValueError(f"Invalid JSON format for {_key}") from None
         return value
     
     @property
@@ -274,7 +274,7 @@ class WorkflowExecution(Base):
     execution_id = Column(String(100), unique=True, nullable=False)  # UUID for tracking
     status = Column(SQLEnum(ExecutionStatus), default=ExecutionStatus.PENDING, nullable=False)
     triggered_by = Column(String(50), default='manual', nullable=False)  # manual, scheduled, api, webhook
-    start_time = Column(DateTime, default=func.now(), nullable=False)
+    start_time = Column(DateTime, default=datetime.utcnow, nullable=False)
     end_time = Column(DateTime, nullable=True)
     duration = Column(Float, nullable=True)  # Duration in seconds
     execution_data = Column(JSON, nullable=True)  # Store execution results
@@ -283,7 +283,7 @@ class WorkflowExecution(Base):
     stack_trace = Column(Text, nullable=True)
     nodes_executed = Column(JSON, default=list, nullable=True)  # Track which nodes executed
     resources_used = Column(JSON, nullable=True)  # CPU, memory, etc.
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Constraints
     __table_args__ = (
@@ -297,7 +297,7 @@ class WorkflowExecution(Base):
     workflow = relationship("Workflow", back_populates="executions")
     
     @validates('execution_id')
-    def validate_execution_id(self, key, execution_id):
+    def validate_execution_id(self, _key, execution_id):
         """Validate execution ID format"""
         if not execution_id:
             raise ValueError("Execution ID is required")
@@ -307,7 +307,7 @@ class WorkflowExecution(Base):
             uuid.UUID(execution_id)
             return execution_id
         except ValueError:
-            raise ValueError("Execution ID must be a valid UUID")
+            raise ValueError("Execution ID must be a valid UUID") from None
     
     def __repr__(self):
         return f"<WorkflowExecution(id={self.id}, workflow_id={self.workflow_id}, status='{self.status.value}')>"
@@ -335,8 +335,8 @@ class EmailCampaign(Base):
     bounce_rate = Column(Float, default=0.0, nullable=False)  # Percentage
     unsubscribe_rate = Column(Float, default=0.0, nullable=False)  # Percentage
     tags = Column(JSON, default=list, nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Constraints
     __table_args__ = (
@@ -359,13 +359,13 @@ class EmailCampaign(Base):
     analytics = relationship("EmailAnalytics", back_populates="campaign", cascade="all, delete-orphan")
     
     @validates('name')
-    def validate_name(self, key, name):
+    def validate_name(self, _key, name):
         if not name or not name.strip():
             raise ValueError("Campaign name is required")
         return name.strip()
     
     @validates('subject')
-    def validate_subject(self, key, subject):
+    def validate_subject(self, _key, subject):
         if not subject or not subject.strip():
             raise ValueError("Email subject is required")
         subject = subject.strip()
@@ -374,7 +374,7 @@ class EmailCampaign(Base):
         return subject
     
     @validates('sender_email', 'reply_to')
-    def validate_email_addresses(self, key, email):
+    def validate_email_addresses(self, _key, email):
         if email:
             email = email.lower().strip()
             # Basic email format validation (less strict for demo)
@@ -384,7 +384,7 @@ class EmailCampaign(Base):
         return email
     
     @validates('recipients')
-    def validate_recipients(self, key, recipients):
+    def validate_recipients(self, _key, recipients):
         if not recipients:
             return []
         if isinstance(recipients, str):
@@ -440,8 +440,8 @@ class EmailAnalytics(Base):
     click_tracking_data = Column(JSON, nullable=True)  # URL click details
     geographic_data = Column(JSON, nullable=True)  # Geographic distribution
     device_data = Column(JSON, nullable=True)  # Device/client analytics
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Constraints
     __table_args__ = (
@@ -506,8 +506,8 @@ class ScheduledTask(Base):
     max_retries = Column(Integer, default=3, nullable=False)
     retry_delay = Column(Integer, default=300, nullable=False)  # Seconds
     timeout = Column(Integer, default=3600, nullable=False)  # Seconds
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Constraints
     __table_args__ = (
@@ -529,13 +529,13 @@ class ScheduledTask(Base):
     task_executions = relationship("TaskExecution", back_populates="scheduled_task", cascade="all, delete-orphan")
     
     @validates('name')
-    def validate_name(self, key, name):
+    def validate_name(self, _key, name):
         if not name or not name.strip():
             raise ValueError("Task name is required")
         return name.strip()
     
     @validates('schedule_expression')
-    def validate_cron_expression(self, key, expression):
+    def validate_cron_expression(self, _key, expression):
         """Validate cron expression format"""
         if not expression:
             raise ValueError("Schedule expression is required")
@@ -548,7 +548,7 @@ class ScheduledTask(Base):
         return expression.strip()
     
     @validates('timezone')
-    def validate_timezone(self, key, timezone):
+    def validate_timezone(self, _key, timezone):
         """Validate timezone"""
         import pytz
         if timezone not in pytz.all_timezones:
@@ -569,13 +569,13 @@ class TaskExecution(Base):
     scheduled_task_id = Column(Integer, ForeignKey("scheduled_tasks.id", ondelete="CASCADE"), nullable=False)
     execution_id = Column(String(100), unique=True, nullable=False)
     status = Column(SQLEnum(ExecutionStatus), default=ExecutionStatus.PENDING, nullable=False)
-    start_time = Column(DateTime, default=func.now(), nullable=False)
+    start_time = Column(DateTime, default=datetime.utcnow, nullable=False)
     end_time = Column(DateTime, nullable=True)
     duration = Column(Float, nullable=True)
     result_data = Column(JSON, nullable=True)
     error_message = Column(Text, nullable=True)
     retry_count = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Constraints
     __table_args__ = (
@@ -610,8 +610,8 @@ class APIIntegration(Base):
     rate_limit_reset = Column(DateTime, nullable=True)
     webhook_url = Column(String(2048), nullable=True)
     webhook_secret = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Constraints
     __table_args__ = (
@@ -631,13 +631,13 @@ class APIIntegration(Base):
     integration_logs = relationship("IntegrationLog", back_populates="integration", cascade="all, delete-orphan")
     
     @validates('name')
-    def validate_name(self, key, name):
+    def validate_name(self, _key, name):
         if not name or not name.strip():
             raise ValueError("Integration name is required")
         return name.strip()
     
     @validates('api_endpoint', 'webhook_url')
-    def validate_urls(self, key, url):
+    def validate_urls(self, _key, url):
         if url and url.strip():
             import re
             url_pattern = re.compile(
@@ -668,7 +668,7 @@ class IntegrationLog(Base):
     response_body = Column(Text, nullable=True)
     response_time = Column(Float, nullable=True)  # In milliseconds
     error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Constraints
     __table_args__ = (
@@ -698,7 +698,7 @@ class AuditLog(Base):
     user_agent = Column(String(500), nullable=True)
     success = Column(Boolean, nullable=False)
     error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Constraints
     __table_args__ = (
@@ -735,8 +735,8 @@ class WorkflowTemplate(Base):
     tags = Column(JSON, default=list, nullable=True)
     author_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     version = Column(String(20), default='1.0.0', nullable=False)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Constraints
     __table_args__ = (
@@ -757,7 +757,7 @@ class WorkflowTemplate(Base):
     template_ratings = relationship("TemplateRating", back_populates="template", cascade="all, delete-orphan")
     
     @validates('name')
-    def validate_name(self, key, name):
+    def validate_name(self, _key, name):
         if not name or not name.strip():
             raise ValueError("Template name is required")
         return name.strip()
@@ -771,8 +771,8 @@ class TemplateRating(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     rating = Column(Integer, nullable=False)  # 1-5 stars
     review = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Constraints
     __table_args__ = (

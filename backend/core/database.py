@@ -2,36 +2,35 @@
 Enhanced database configuration and initialization with proper error handling and connection pooling.
 """
 
-from sqlalchemy import create_engine, MetaData, event, text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import MetaData, event, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import StaticPool
 import asyncio
 import logging
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from .config import settings
+from backend.core.config import settings
 
 # Setup logging
 logger = logging.getLogger(__name__)
 
 # Import models to ensure they're registered
-from .models import Base
+from backend.core.models import Base
 
 # Create async engine with proper configuration
 def get_database_url() -> str:
     """Get the appropriate database URL for async operations"""
-    if settings.DATABASE_URL.startswith('sqlite'):
+    db_url = str(settings.DATABASE_URL)
+    if db_url.startswith('sqlite'):
         # For SQLite, use aiosqlite
-        return settings.DATABASE_URL.replace('sqlite://', 'sqlite+aiosqlite://')
-    elif settings.DATABASE_URL.startswith('postgresql'):
+        return db_url.replace('sqlite://', 'sqlite+aiosqlite://')
+    elif db_url.startswith('postgresql'):
         # For PostgreSQL, use asyncpg
-        return settings.DATABASE_URL.replace('postgresql://', 'postgresql+asyncpg://')
+        return db_url.replace('postgresql://', 'postgresql+asyncpg://')
     else:
         # Default fallback
-        return settings.DATABASE_URL
+        return db_url
 
 # Database URL for async operations
 DATABASE_URL = get_database_url()
@@ -79,7 +78,7 @@ metadata = MetaData()
 
 # Enable foreign key constraints for SQLite
 @event.listens_for(engine.sync_engine if hasattr(engine, 'sync_engine') else engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
+def set_sqlite_pragma(dbapi_connection, _connection_record):
     """Enable foreign key constraints for SQLite"""
     if 'sqlite' in str(dbapi_connection):
         cursor = dbapi_connection.cursor()
@@ -111,7 +110,7 @@ async def init_db() -> None:
         await test_connection()
         
     except Exception as e:
-        logger.error(f"❌ Database initialization failed: {e}")
+        logger.error("❌ Database initialization failed: %s", e)
         raise
 
 async def test_connection() -> bool:
@@ -129,7 +128,7 @@ async def test_connection() -> bool:
             return True
             
     except Exception as e:
-        logger.error(f"❌ Database connection test failed: {e}")
+        logger.error("❌ Database connection test failed: %s", e)
         return False
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
@@ -143,7 +142,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
         await session.commit()
     except Exception as e:
         await session.rollback()
-        logger.error(f"Database session error: {e}")
+        logger.error("Database session error: %s", e)
         raise
     finally:
         await session.close()
@@ -160,7 +159,7 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
         await session.commit()
     except Exception as e:
         await session.rollback()
-        logger.error(f"Database session error: {e}")
+        logger.error("Database session error: %s", e)
         raise
     finally:
         await session.close()
@@ -180,7 +179,7 @@ async def close_db() -> None:
         await engine.dispose()
         logger.info("✅ Database connections closed successfully")
     except Exception as e:
-        logger.error(f"❌ Error closing database connections: {e}")
+        logger.error("❌ Error closing database connections: %s", e)
 
 # Health check function
 async def health_check() -> dict:
@@ -209,7 +208,7 @@ async def health_check() -> dict:
         }
         
     except Exception as e:
-        logger.error(f"Database health check failed: {e}")
+        logger.error("Database health check failed: %s", e)
         return {
             "status": "unhealthy",
             "error": str(e),
@@ -240,7 +239,7 @@ async def get_db_stats() -> dict:
             return stats
             
     except Exception as e:
-        logger.error(f"Error getting database statistics: {e}")
+        logger.error("Error getting database statistics: %s", e)
         return {"error": str(e)}
 
 # Cleanup function for application shutdown
@@ -250,4 +249,4 @@ async def cleanup_database():
         await close_db()
         logger.info("🧹 Database cleanup completed")
     except Exception as e:
-        logger.error(f"❌ Database cleanup error: {e}")
+        logger.error("❌ Database cleanup error: %s", e)

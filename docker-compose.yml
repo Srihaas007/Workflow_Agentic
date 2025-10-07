@@ -2,19 +2,18 @@ services:
   backend:
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: Dockerfile.backend
     container_name: aiap-backend
     ports:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
       - UVICORN_RELOAD=true
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-THIS-IS-DEV-ONLY-12345678901234567890}
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://frontend:3000
     volumes:
       - ./:/app
       - backend_venv_cache:/root/.cache/pip
-      - backend_db:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       - node-red
@@ -22,7 +21,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
+      dockerfile: Dockerfile.frontend
     container_name: aiap-frontend
     ports:
       - "3000:3000"
@@ -30,16 +29,17 @@ services:
       - CHOKIDAR_USEPOLLING=true
       - WDS_SOCKET_PORT=0
       - BROWSER=none
+      - API_PROXY_TARGET=http://backend:8000
     volumes:
       - ./frontend:/usr/src/app
-      - /usr/src/app/node_modules
+      - frontend_node_modules:/usr/src/app/node_modules
     depends_on:
       - backend
 
   node-red:
     build:
       context: .
-      dockerfile: node-red/Dockerfile
+      dockerfile: Dockerfile.nodered
     container_name: aiap-nodered
     ports:
       - "1880:1880"
@@ -50,6 +50,6 @@ services:
       - node_red_data:/usr/src/node-red/node-red-data
 
 volumes:
-  backend_db:
   backend_venv_cache:
+  frontend_node_modules:
   node_red_data:

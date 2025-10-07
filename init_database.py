@@ -1,24 +1,226 @@
-"""
-Database initialization script with sample data and validation testing.
-Run this script to populate the database with initial data for testing.
-"""
+#!/usr/bin/env python3#!/usr/bin/env python3
 
-import asyncio
-import sys
-import os
-from datetime import datetime, timedelta
-from pathlib import Path
+""""""
 
-# Add the project root to the Python path
-sys.path.append(str(Path(__file__).parent.parent))
+Clean database initialization script for the AI Automation Platform.Clean database initialization script for the AI Automation Platform.
 
-from backend.core.database import init_db, get_db_session
-from backend.core.models import (
-    User, UserPreference, APIKey, Workflow, WorkflowExecution, 
-    EmailCampaign, EmailAnalytics, ScheduledTask, APIIntegration, 
-    WorkflowTemplate, AuditLog, UserRole, WorkflowStatus, 
-    ExecutionStatus, TaskType, IntegrationType
-)
+This script initializes the database schema and creates sample data for testing.This script initializes the database schema and creates sample data for testing.
+
+""""""
+
+
+
+import asyncioimport asyncio
+
+import osimport os
+
+import sysimport sys
+
+from pathlib import Pathfrom pathlib import Path
+
+from datetime import datetime, timedeltafrom datetime import datetime, timedelta
+
+import hashlibimport hashlib
+
+
+
+# Add the project root to the Python path# Add the project root to the Python path
+
+sys.path.append(str(Path(__file__).parent))sys.path.append(str(Path(__file__).parent))
+
+
+
+# Set required environment variables# Set required environment variables
+
+os.environ.setdefault('JWT_SECRET_KEY', 'dev-jwt-secret-key-with-32-chars-minimum-requirement')os.environ.setdefault('JWT_SECRET_KEY', 'dev-jwt-secret-key-with-32-chars-minimum-requirement')
+
+
+
+from backend.core.database import init_db, get_db_sessionfrom backend.core.database import init_db, get_db_session
+
+from backend.core.models import (from backend.core.models import (
+
+    User, Workflow, EmailCampaign, ScheduledTask,     User, Workflow, EmailCampaign, ScheduledTask, 
+
+    UserRole, WorkflowStatus, TaskType    UserRole, WorkflowStatus, TaskType
+
+))
+
+
+
+
+
+async def create_sample_user():async def create_sample_user():
+
+    """Create a sample user for testing"""    """Create a sample user for testing"""
+
+    async with get_db_session() as session:    async with get_db_session() as session:
+
+        # Check if user already exists        # Check if user already exists
+
+        existing_user = await session.get(User, 1)        existing_user = await session.get(User, 1)
+
+        if existing_user:        if existing_user:
+
+            print("Sample user already exists, skipping creation.")            print("Sample user already exists, skipping creation.")
+
+            return            return
+
+                
+
+        # Create sample user        # Create sample user
+
+        user = User(        user = User(
+
+            username="admin",            username="admin",
+
+            email="admin@example.com",            email="admin@example.com",
+
+            password_hash=hashlib.sha256("password123".encode()).hexdigest(),            password_hash=hashlib.sha256("password123".encode()).hexdigest(),
+
+            first_name="Admin",            first_name="Admin",
+
+            last_name="User",            last_name="User",
+
+            role=UserRole.ADMIN,            role=UserRole.ADMIN,
+
+            is_active=True,            is_active=True,
+
+            is_verified=True            is_verified=True
+
+        )        )
+
+                
+
+        session.add(user)        session.add(user)
+
+        await session.commit()        await session.commit()
+
+        print("✅ Sample user created: admin@example.com (password: password123)")        print("✅ Sample user created: admin@example.com (password: password123)")
+
+
+
+
+
+async def create_sample_workflow():async def create_sample_workflow():
+
+    """Create a sample workflow for testing"""    """Create a sample workflow for testing"""
+
+    async with get_db_session() as session:    async with get_db_session() as session:
+
+        workflow = Workflow(        workflow = Workflow(
+
+            name="Sample Email Workflow",            name="Sample Email Workflow",
+
+            description="A simple workflow that sends welcome emails",            description="A simple workflow that sends welcome emails",
+
+            owner_id=1,            owner_id=1,
+
+            status=WorkflowStatus.ACTIVE,            status=WorkflowStatus.ACTIVE,
+
+            definition={            definition={
+
+                "steps": [                "steps": [
+
+                    {                    {
+
+                        "id": "trigger",                        "id": "trigger",
+
+                        "type": "email_trigger",                        "type": "email_trigger",
+
+                        "name": "Email Trigger"                        "name": "Email Trigger"
+
+                    },                    },
+
+                    {                    {
+
+                        "id": "send_email",                        "id": "send_email",
+
+                        "type": "send_email",                        "type": "send_email",
+
+                        "name": "Send Welcome Email",                        "name": "Send Welcome Email",
+
+                        "config": {                        "config": {
+
+                            "template": "welcome",                            "template": "welcome",
+
+                            "subject": "Welcome to AI Automation Platform!"                            "subject": "Welcome to AI Automation Platform!"
+
+                        }                        }
+
+                    }                    }
+
+                ]                ]
+
+            }            }
+
+        )        )
+
+                
+
+        session.add(workflow)        session.add(workflow)
+
+        await session.commit()        await session.commit()
+
+        print("✅ Sample workflow created")        print("✅ Sample workflow created")
+
+
+
+
+
+async def main():async def main():
+
+    """Main initialization function"""    """Main initialization function"""
+
+    try:    try:
+
+        print("🚀 Initializing AI Automation Platform Database...")        print("🚀 Initializing AI Automation Platform Database...")
+
+                
+
+        # Initialize database schema        # Initialize database schema
+
+        await init_db()        await init_db()
+
+        print("📊 Database schema initialized")        print("📊 Database schema initialized")
+
+                
+
+        # Create sample data        # Create sample data
+
+        await create_sample_user()        await create_sample_user()
+
+        await create_sample_workflow()        await create_sample_workflow()
+
+                
+
+        print("✅ Database initialization completed successfully!")        print("✅ Database initialization completed successfully!")
+
+        print("\nYou can now:")        print("\nYou can now:")
+
+        print("1. Start the backend: python main.py")        print("1. Start the backend: python main.py")
+
+        print("2. Start the frontend: cd frontend && npm start")        print("2. Start the frontend: cd frontend && npm start")
+
+        print("3. Start Node-RED: cd node-red && node start-nodered.js")        print("3. Start Node-RED: cd node-red && node start-nodered.js")
+
+        print("4. Or use Docker: npm run ddev:start")        print("4. Or use Docker: npm run ddev:start")
+
+                
+
+    except Exception as e:    except Exception as e:
+
+        print(f"❌ Database initialization failed: {e}")        print(f"❌ Database initialization failed: {e}")
+
+        sys.exit(1)        sys.exit(1)
+
+
+
+
+
+if __name__ == "__main__":if __name__ == "__main__":
+
+    asyncio.run(main())    asyncio.run(main())
 from backend.core.config import settings
 import hashlib
 import uuid

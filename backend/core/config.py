@@ -3,9 +3,9 @@ Enhanced configuration settings for the AI-Powered Automation Platform.
 Includes comprehensive validation and security settings.
 """
 
-from typing import List, Optional, Union
+from typing import List, Optional
 from pydantic_settings import BaseSettings
-from pydantic import Field, field_validator, AnyHttpUrl
+from pydantic import Field, field_validator
 import os
 from pathlib import Path
 
@@ -339,11 +339,11 @@ class Settings(BaseSettings):
     
     def is_production(self) -> bool:
         """Check if running in production environment"""
-        return self.ENVIRONMENT.lower() == 'production'
+        return str(self.ENVIRONMENT).lower() == 'production'
     
     def is_development(self) -> bool:
         """Check if running in development environment"""
-        return self.ENVIRONMENT.lower() == 'development'
+        return str(self.ENVIRONMENT).lower() == 'development'
     
     def get_database_config(self) -> dict:
         """Get database configuration parameters"""
