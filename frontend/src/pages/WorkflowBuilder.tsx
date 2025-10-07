@@ -50,6 +50,7 @@ import ReactFlow, {
   Panel
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { saveWorkflow, publishWorkflow } from '../api/workflows';
 
 // Custom Node Components
 import { CustomNode } from '../components/WorkflowBuilder/CustomNode';
@@ -142,6 +143,7 @@ const WorkflowBuilder: React.FC = () => {
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [lastSavedWorkflowId, setLastSavedWorkflowId] = useState<number | null>(null);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -192,23 +194,54 @@ const WorkflowBuilder: React.FC = () => {
     setShowProperties(true);
   };
 
-  const handleSaveWorkflow = () => {
+  const handleSaveWorkflow = async () => {
     if (!workflowName.trim()) return;
+    try {
+      const payload = {
+        name: workflowName,
+        version: 1,
+        nodes: nodes.map(n => ({ id: n.id, type: n.data?.type || n.type || 'custom', label: n.data?.label, data: n.data, position: n.position })),
+        edges: edges.map(e => ({ id: e.id, source: e.source, target: e.target, sourceHandle: (e as any).sourceHandle, targetHandle: (e as any).targetHandle, label: (e as any).label })),
+        metadata: {},
+      };
+      const res = await saveWorkflow(payload as any);
+      setLastSavedWorkflowId(res.workflow_id);
+      alert(`Saved! ID=${res.workflow_id}, version=${res.version}`);
+      setSaveDialog(false);
+      setWorkflowName('');
+    } catch (err: any) {
+      alert(err?.message || 'Save failed');
+    }
+  };
 
-    const workflow = {
-      name: workflowName,
-      nodes,
-      edges,
-      created: new Date().toISOString()
-    };
-
-    // Save to localStorage for demo
-    const savedWorkflows = JSON.parse(localStorage.getItem('workflows') || '[]');
-    savedWorkflows.push(workflow);
-    localStorage.setItem('workflows', JSON.stringify(savedWorkflows));
-
-    setSaveDialog(false);
-    setWorkflowName('');
+  const handlePublish = async () => {
+    try {
+      let wfId = lastSavedWorkflowId;
+      if (!wfId) {
+        // auto-save first if not saved in this session
+        if (!workflowName.trim()) {
+          setSaveDialog(true);
+          alert('Please provide a workflow name to save before publishing.');
+          return;
+        }
+        const payload = {
+          name: workflowName,
+          version: 1,
+          nodes: nodes.map(n => ({ id: n.id, type: n.data?.type || n.type || 'custom', label: n.data?.label, data: n.data, position: n.position })),
+          edges: edges.map(e => ({ id: e.id, source: e.source, target: e.target, sourceHandle: (e as any).sourceHandle, targetHandle: (e as any).targetHandle, label: (e as any).label })),
+          metadata: {},
+        };
+        const saved = await saveWorkflow(payload as any);
+        wfId = saved.workflow_id;
+        setLastSavedWorkflowId(wfId);
+      }
+      const pub = await publishWorkflow(wfId!);
+      alert(`Published to Node-RED. Status=${pub.status}`);
+    } catch (err: any) {
+      alert(err?.message || 'Publish failed');
+    } finally {
+      setMenuAnchor(null);
+    }
   };
 
   const handleGetAISuggestions = async () => {
@@ -456,6 +489,10 @@ const WorkflowBuilder: React.FC = () => {
         <MenuItem onClick={() => setMenuAnchor(null)} sx={{ color: '#ffffff' }}>
           <DownloadIcon sx={{ mr: 2 }} />
           Export Workflow
+        </MenuItem>
+        <MenuItem onClick={handlePublish} sx={{ color: '#00d4ff' }}>
+          <FlowIcon sx={{ mr: 2 }} />
+          Publish to Node-RED
         </MenuItem>
         <MenuItem onClick={() => setMenuAnchor(null)} sx={{ color: '#ff6b35' }}>
           <DeleteIcon sx={{ mr: 2 }} />

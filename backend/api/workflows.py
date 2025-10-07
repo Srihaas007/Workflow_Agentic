@@ -13,6 +13,9 @@ import logging
 from backend.ai_engine.workflow_ai import WorkflowAI
 from backend.core.database import get_db
 from backend.core.security import get_current_user
+from backend.core.models import Workflow, WorkflowStatus
+from sqlalchemy import select
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +50,179 @@ class WorkflowExecuteRequest(BaseModel):
     input_data: Dict[str, Any] = {}
     execution_mode: str = "async"  # "sync" or "async"
 
+
+# === N8N-style builder contracts (React Flow) ===
+class RFNode(BaseModel):
+    id: str
+    type: str
+    label: Optional[str] = None
+    data: Dict[str, Any] = Field(default_factory=dict)
+    position: Dict[str, float] = Field(default_factory=dict)
+
+
+class RFEdge(BaseModel):
+    id: str
+    source: str
+    target: str
+    sourceHandle: Optional[str] = None
+    targetHandle: Optional[str] = None
+    label: Optional[str] = None
+
+
+class SaveFlowRequest(BaseModel):
+    id: Optional[int] = None
+    name: str
+    version: Optional[int] = 1
+    nodes: List[RFNode]
+    edges: List[RFEdge]
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PublishFlowRequest(BaseModel):
+    workflow_id: int
+
+
+def _translate_to_nodered_flow(name: str, nodes: List[RFNode], edges: List[RFEdge]) -> List[Dict[str, Any]]:
+    """Very small translator: maps 'api' → http request node; others become comment placeholders.
+    Produces a single tab with nodes laid out; wires from edges.
+    """
+    tab_id = "tab_main"
+    nr_flow = [
+        {"id": tab_id, "type": "tab", "label": name, "disabled": False, "info": "Generated from React Flow"}
+    ]
+
+    id_map: Dict[str, str] = {}
+    for n in nodes:
+        nr_id = f"nr_{n.id}"
+        id_map[n.id] = nr_id
+        x = int(n.position.get("x", 100))
+        y = int(n.position.get("y", 100))
+        if n.type == "api":
+            nr_flow.append({
+                "id": nr_id,
+                "type": "http request",
+                "z": tab_id,
+                "name": n.label or n.data.get("label", "API Call"),
+                "method": n.data.get("method", "GET"),
+                "ret": "txt",
+                "url": n.data.get("url", "https://httpbin.org/get"),
+                "headers": n.data.get("headers", []),
+                "x": x,
+                "y": y,
+                "wires": [[]]
+            })
+        else:
+            # Fallback comment node as placeholder for unsupported types
+            nr_flow.append({
+                "id": nr_id,
+                "type": "comment",
+                "z": tab_id,
+                "name": n.label or n.type,
+                "info": str(n.data)[:500],
+                "x": x,
+                "y": y,
+                "wires": []
+            })
+
+    # Wires: create link nodes to simulate edges
+    for e in edges:
+        src = id_map.get(e.source)
+        tgt = id_map.get(e.target)
+        if src and tgt:
+            # Add a wire by appending target id to the first output of source node
+            for nd in nr_flow:
+                if nd.get("id") == src:
+                    if nd.get("wires") is None:
+                        nd["wires"] = [[]]
+                    if not nd["wires"]:
+                        nd["wires"].append([])
+                    if tgt not in nd["wires"][0]:
+                        nd["wires"][0].append(tgt)
+                    break
+
+    return nr_flow
+
+
+@router.post("/save")
+async def save_flow(
+    req: SaveFlowRequest,
+    db = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Create or update a workflow definition persisted in DB (React Flow JSON)."""
+    try:
+        owner_id = current_user.get("user_id") or 1  # dev fallback
+        if req.id:
+            result = await db.execute(select(Workflow).where(Workflow.id == req.id))
+            wf = result.scalar_one_or_none()
+            if not wf:
+                raise HTTPException(status_code=404, detail="Workflow not found")
+            wf.name = req.name
+            wf.nodes = [n.dict() for n in req.nodes]
+            wf.edges = [e.dict() for e in req.edges]
+            wf.version = (req.version or wf.version)
+            wf.status = WorkflowStatus.DRAFT
+        else:
+            wf = Workflow(
+                name=req.name,
+                description=req.metadata.get("description"),
+                nodes=[n.dict() for n in req.nodes],
+                edges=[e.dict() for e in req.edges],
+                version=req.version or 1,
+                status=WorkflowStatus.DRAFT,
+                owner_id=owner_id,
+                tags=req.metadata.get("tags", []),
+            )
+            db.add(wf)
+        await db.flush()
+        await db.commit()
+        return {"workflow_id": wf.id, "status": "saved", "version": wf.version}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to save flow")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/publish")
+async def publish_flow(
+    req: PublishFlowRequest,
+    db = Depends(get_db),
+    _current_user: dict = Depends(get_current_user)
+):
+    """Translate a saved React Flow into a Node-RED flow and import via Admin API."""
+    try:
+        result = await db.execute(select(Workflow).where(Workflow.id == req.workflow_id))
+        wf = result.scalar_one_or_none()
+        if not wf:
+            raise HTTPException(status_code=404, detail="Workflow not found")
+
+        nr_flow = _translate_to_nodered_flow(wf.name, [RFNode(**n) for n in wf.nodes], [RFEdge(**e) for e in wf.edges])
+
+        admin_url = "http://localhost:1880/node-red/flows"
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(admin_url, json=nr_flow)
+            if resp.status_code >= 300:
+                raise HTTPException(status_code=502, detail=f"Node-RED publish failed: {resp.text}")
+
+        wf.status = WorkflowStatus.ACTIVE
+        await db.flush()
+        await db.commit()
+        return {"workflow_id": wf.id, "status": "published", "node_red": resp.json() if resp.text else {}}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to publish flow")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
 @router.post("/create")
 async def create_workflow(
     request: WorkflowCreateRequest,
-    background_tasks: BackgroundTasks,
+    _background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
-    db = Depends(get_db)
+    _db = Depends(get_db)
 ):
     """Create a new workflow with AI optimization"""
     try:
@@ -86,13 +256,13 @@ async def create_workflow(
         }
         
     except Exception as e:
-        logger.error(f"Workflow creation failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Workflow creation failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @router.post("/optimize")
 async def optimize_workflow(
     request: WorkflowOptimizeRequest,
-    current_user: dict = Depends(get_current_user)
+    _current_user: dict = Depends(get_current_user)
 ):
     """Optimize an existing workflow using AI"""
     try:
@@ -114,7 +284,7 @@ async def optimize_workflow(
         
         # Generate optimizations
         optimizations = await workflow_ai.suggest_optimizations(
-            workflow_data, 
+            workflow_data,
             goals=request.optimization_goals
         )
         
@@ -141,15 +311,15 @@ async def optimize_workflow(
             ]
         }
         
-    except Exception as e:
-        logger.error(f"Workflow optimization failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except (KeyError, ValueError, TypeError, RuntimeError) as e:
+        logger.error("Workflow optimization failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @router.post("/execute")
 async def execute_workflow(
     request: WorkflowExecuteRequest,
-    background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    _background_tasks: BackgroundTasks,
+    _current_user: dict = Depends(get_current_user)
 ):
     """Execute a workflow with AI monitoring"""
     try:
@@ -170,7 +340,7 @@ async def execute_workflow(
             # Simulate execution with AI monitoring
             execution_result = await workflow_ai.execute_workflow(
                 workflow_data,
-                request.input_data
+                inputs=request.input_data
             )
             
             return {
@@ -187,7 +357,7 @@ async def execute_workflow(
             # Synchronous execution
             result = await workflow_ai.execute_workflow(
                 workflow_data,
-                request.input_data
+                inputs=request.input_data
             )
             
             return {
@@ -201,13 +371,13 @@ async def execute_workflow(
             }
             
     except Exception as e:
-        logger.error(f"Workflow execution failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Workflow execution failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @router.get("/executions/{execution_id}/status")
 async def get_execution_status(
     execution_id: str,
-    current_user: dict = Depends(get_current_user)
+    _current_user: dict = Depends(get_current_user)
 ):
     """Get the status of a workflow execution"""
     try:
@@ -233,14 +403,14 @@ async def get_execution_status(
         return status_data
         
     except Exception as e:
-        logger.error(f"Failed to get execution status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Failed to get execution status: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @router.get("/{workflow_id}/insights")
 async def get_workflow_insights(
     workflow_id: str,
     time_period: Optional[str] = "7d",
-    current_user: dict = Depends(get_current_user)
+    _current_user: dict = Depends(get_current_user)
 ):
     """Get AI-powered insights for a workflow"""
     try:
@@ -281,15 +451,15 @@ async def get_workflow_insights(
         }
         
     except Exception as e:
-        logger.error(f"Failed to get workflow insights: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Failed to get workflow insights: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @router.get("/")
 async def list_workflows(
     limit: int = 20,
     offset: int = 0,
     status: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    _current_user: dict = Depends(get_current_user)
 ):
     """List workflows with filtering options"""
     try:
@@ -351,5 +521,5 @@ async def list_workflows(
         }
         
     except Exception as e:
-        logger.error(f"Failed to list workflows: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Failed to list workflows: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e

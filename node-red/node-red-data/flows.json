@@ -1,0 +1,173 @@
+[
+    {
+        "id": "ai-platform-tab",
+        "type": "tab",
+        "label": "AI Platform Integration",
+        "disabled": false,
+        "info": "Main workflow for AI Automation Platform integration"
+    },
+    {
+        "id": "welcome-inject",
+        "type": "inject",
+        "z": "ai-platform-tab",
+        "name": "Welcome to AI Platform",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"message\":\"Welcome to AI Automation Platform Node-RED Integration!\",\"timestamp\":\"$(Date.now())\"}",
+        "payloadType": "json",
+        "x": 180,
+        "y": 100,
+        "wires": [
+            [
+                "welcome-debug"
+            ]
+        ]
+    },
+    {
+        "id": "welcome-debug",
+        "type": "debug",
+        "z": "ai-platform-tab",
+        "name": "AI Platform Debug",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 450,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "api-test-inject",
+        "type": "inject",
+        "z": "ai-platform-tab",
+        "name": "Test Backend API",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 160,
+        "y": 200,
+        "wires": [
+            [
+                "api-test-function"
+            ]
+        ]
+    },
+    {
+        "id": "api-test-function",
+        "type": "function",
+        "z": "ai-platform-tab",
+        "name": "Call AI Platform API",
+        "func": "// Test connection to AI Platform backend\nconst aiPlatform = global.get('aiPlatform');\n\nmsg.payload = {\n    test: 'API connection test',\n    timestamp: new Date().toISOString(),\n    backend_url: global.get('API_BASE_URL')\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 400,
+        "y": 200,
+        "wires": [
+            [
+                "api-test-debug"
+            ]
+        ]
+    },
+    {
+        "id": "api-test-debug",
+        "type": "debug",
+        "z": "ai-platform-tab",
+        "name": "API Test Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 650,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "workflow-trigger",
+        "type": "inject",
+        "z": "ai-platform-tab",
+        "name": "Trigger Workflow",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"workflowId\":\"example-workflow\",\"data\":{\"message\":\"Hello from Node-RED!\"}}",
+        "payloadType": "json",
+        "x": 160,
+        "y": 300,
+        "wires": [
+            [
+                "workflow-processor"
+            ]
+        ]
+    },
+    {
+        "id": "workflow-processor",
+        "type": "function",
+        "z": "ai-platform-tab",
+        "name": "Process Workflow",
+        "func": "// Process workflow data\nconst workflowData = msg.payload;\n\n// Add processing timestamp\nworkflowData.processed_at = new Date().toISOString();\nworkflowData.node_red_processed = true;\n\n// Log the workflow processing\nnode.log(`Processing workflow: ${workflowData.workflowId}`);\n\nmsg.payload = workflowData;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 380,
+        "y": 300,
+        "wires": [
+            [
+                "workflow-debug"
+            ]
+        ]
+    },
+    {
+        "id": "workflow-debug",
+        "type": "debug",
+        "z": "ai-platform-tab",
+        "name": "Workflow Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 610,
+        "y": 300,
+        "wires": []
+    }
+]

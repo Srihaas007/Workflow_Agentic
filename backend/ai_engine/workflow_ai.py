@@ -6,7 +6,6 @@ and execution capabilities using machine learning and AI.
 """
 
 import asyncio
-import json
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import logging
@@ -22,7 +21,7 @@ class WorkflowAI:
         self.execution_history = []
         self.learning_enabled = True
         
-    async def suggest_optimizations(self, workflow_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def suggest_optimizations(self, workflow_data: Dict[str, Any], goals: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Analyze workflow and suggest optimizations using AI.
         
@@ -56,7 +55,8 @@ class WorkflowAI:
                     "estimated_time_savings": self._calculate_time_savings(step_optimizations),
                     "efficiency_improvement": complexity_analysis["efficiency_gain"]
                 },
-                "priority": self._calculate_priority(complexity_analysis, bottlenecks)
+                "priority": self._calculate_priority(complexity_analysis, bottlenecks),
+                "goals_considered": goals or []
             }
             
             # Cache the optimization for learning
@@ -64,8 +64,8 @@ class WorkflowAI:
             
             return optimization_result
             
-        except Exception as e:
-            logger.error(f"Workflow optimization failed: {e}")
+        except (ValueError, KeyError, TypeError, RuntimeError) as e:
+            logger.error("Workflow optimization failed: %s", e)
             return {"error": str(e), "optimizations": {}}
     
     def _analyze_complexity(self, steps: List[Dict]) -> Dict[str, Any]:
@@ -104,8 +104,8 @@ class WorkflowAI:
                 "efficiency_gain": efficiency_gain
             }
             
-        except Exception as e:
-            logger.error(f"Complexity analysis failed: {e}")
+        except (ValueError, KeyError, TypeError, RuntimeError) as e:
+            logger.error("Complexity analysis failed: %s", e)
             return {"score": 0, "efficiency_gain": 0}
     
     def _suggest_step_optimizations(self, steps: List[Dict]) -> List[Dict]:
@@ -232,7 +232,59 @@ class WorkflowAI:
         else:
             return "low"
     
-    async def execute_workflow(self, workflow_data: Dict[str, Any], optimizations: Dict[str, Any] = None) -> Dict[str, Any]:
+    async def analyze_workflow_complexity(self, workflow_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Public method to analyze workflow complexity and return a summary."""
+        steps = workflow_data.get("steps", [])
+        comp = self._analyze_complexity(steps)
+        return {
+            "summary": comp,
+            "notes": "Lower scores are better; consider reducing conditionals/loops/api calls"
+        }
+
+    async def optimize_workflow_execution(self, workflow_data: Dict[str, Any], constraints: Dict[str, Any]) -> Dict[str, Any]:
+        """Simulate applying optimizations under given constraints and estimate improvements."""
+        base = self._analyze_complexity(workflow_data.get("steps", []))
+        constraint_notes = [f"{k}={v}" for k, v in (constraints or {}).items()]
+        return {
+            "baseline_complexity": base,
+            "constraints": constraints or {},
+            "estimated_improvements": {
+                "execution_time_reduction": 0.3 if base["score"] > 3 else 0.15,
+                "success_rate_improvement": 0.12,
+                "resource_efficiency_gain": 0.2
+            },
+            "notes": ", ".join(constraint_notes) if constraint_notes else "no constraints"
+        }
+
+    async def get_performance_insights(self, workflow_id: str, performance_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate insights such as reliability score and hotspots from performance data."""
+        total = max(performance_data.get("total_executions", 0), 1)
+        success = performance_data.get("successful_executions", 0)
+        success_rate = success / total
+        avg_time = performance_data.get("avg_execution_time", 0)
+        reliability_score = max(0, min(100, int(success_rate * 100 - (avg_time / 10))))
+        return {
+            "workflow_id": workflow_id,
+            "reliability_score": reliability_score,
+            "success_rate": round(success_rate * 100, 1),
+            "hotspots": performance_data.get("bottlenecks", []),
+            "peak_usage_hours": performance_data.get("peak_usage_hours", [])
+        }
+
+    async def get_improvement_suggestions(self, performance_data: Dict[str, Any]) -> List[str]:
+        """Suggest improvements based on performance telemetry."""
+        suggestions: List[str] = []
+        if performance_data.get("avg_execution_time", 0) > 180:
+            suggestions.append("Consider adding caching layers to reduce execution time")
+        if performance_data.get("successful_executions", 0) < performance_data.get("total_executions", 0) * 0.9:
+            suggestions.append("Add retries and circuit breakers to improve reliability")
+        if (performance_data.get("resource_usage", {}).get("cpu", 0)) > 70:
+            suggestions.append("Optimize CPU-intensive steps or add rate limiting")
+        if not suggestions:
+            suggestions.append("No critical issues detected; maintain and monitor")
+        return suggestions
+
+    async def execute_workflow(self, workflow_data: Dict[str, Any], inputs: Optional[Dict[str, Any]] = None, optimizations: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Execute a workflow with optional optimizations applied.
         
@@ -255,7 +307,8 @@ class WorkflowAI:
                 "steps_completed": 0,
                 "total_steps": len(steps),
                 "results": [],
-                "errors": []
+                "errors": [],
+                "inputs": inputs or {}
             }
             
             # Simulate workflow execution (in real implementation, this would execute actual steps)
@@ -276,14 +329,21 @@ class WorkflowAI:
             execution_result["status"] = "completed" if not execution_result["errors"] else "completed_with_errors"
             execution_result["completed_at"] = datetime.utcnow().isoformat()
             execution_result["execution_time"] = "2.3s"  # Mock execution time
+            execution_result["total_execution_time"] = 2.3
+            execution_result["success"] = len(execution_result["errors"]) == 0
+            execution_result["metrics"] = {
+                "avg_step_time": 0.1,
+                "max_step_time": 0.2
+            }
+            execution_result["execution_plan"] = {"steps": [s.get("name") for s in steps]}
             
             # Store execution history for learning
             self.execution_history.append(execution_result)
             
             return execution_result
             
-        except Exception as e:
-            logger.error(f"Workflow execution failed: {e}")
+        except (ValueError, KeyError, TypeError, RuntimeError) as e:
+            logger.error("Workflow execution failed: %s", e)
             return {
                 "workflow_id": workflow_data.get("id", "unknown"),
                 "status": "failed",
