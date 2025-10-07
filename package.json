@@ -1,0 +1,28 @@
+{
+  "name": "ai-automation-platform",
+  "version": "1.0.0",
+  "description": "AI-powered automation platform with Node-RED integration",
+  "main": "main.py",
+  "scripts": {
+    "test-integration": "node test-integration.js",
+    "start-backend": "python main.py",
+    "start-frontend": "cd frontend && npm start",
+    "start-nodered": "cd node-red && node start-nodered.js",
+    "start-all": "concurrently \"npm run start-backend\" \"npm run start-frontend\" \"npm run start-nodered\""
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "concurrently": "^8.2.0"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "ai",
+    "automation",
+    "workflow",
+    "node-red",
+    "fastapi",
+    "react"
+  ],
+  "author": "AI Automation Platform",
+  "license": "MIT"
+}

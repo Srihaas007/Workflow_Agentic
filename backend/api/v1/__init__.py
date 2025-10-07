@@ -12,8 +12,8 @@ from backend.api.auth import router as auth_router
 # Create main API router
 api_router = APIRouter(prefix="/api/v1")
 
-# Include sub-routers (remove their internal prefixes since we handle it here)
-api_router.include_router(auth_router, tags=["authentication"])  # Auth routes don't need prefix
+# Include sub-routers with proper prefixes
+api_router.include_router(auth_router, prefix="/auth", tags=["authentication"])
 api_router.include_router(workflows_router, prefix="/workflows", tags=["workflows"])
 api_router.include_router(email_router, prefix="/email", tags=["email"])
 

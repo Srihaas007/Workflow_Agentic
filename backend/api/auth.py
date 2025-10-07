@@ -25,7 +25,7 @@ from ..core.schemas import (
 )
 from ..core.config import settings
 
-router = APIRouter(prefix="/auth", tags=["authentication"])
+router = APIRouter(tags=["authentication"])
 security = HTTPBearer()
 
 # JWT Helper Functions

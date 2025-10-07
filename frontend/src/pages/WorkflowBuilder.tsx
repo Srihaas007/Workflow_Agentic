@@ -33,7 +33,8 @@ import {
   Code as CodeIcon,
   DataObject as DataIcon,
   AccountTree as FlowIcon,
-  MoreVert as MoreIcon
+  MoreVert as MoreIcon,
+  OpenInNew as NodeRedIcon
 } from '@mui/icons-material';
 import ReactFlow, {
   Node,
@@ -80,6 +81,13 @@ const initialEdges: Edge[] = [];
 // Available workflow components
 const workflowComponents = [
   {
+    id: 'nodered',
+    type: 'Node-RED Flow',
+    icon: <FlowIcon />,
+    color: '#ff6b35',
+    description: 'Advanced visual flow programming'
+  },
+  {
     id: 'email',
     type: 'Email Action',
     icon: <EmailIcon />,
@@ -90,7 +98,7 @@ const workflowComponents = [
     id: 'schedule',
     type: 'Schedule Task',
     icon: <ScheduleIcon />,
-    color: '#00d4ff',
+    color: '#8b5cf6',
     description: 'Schedule tasks and reminders'
   },
   {
@@ -234,6 +242,11 @@ const WorkflowBuilder: React.FC = () => {
     alert('Workflow execution started! Check the console for details.');
   };
 
+  const handleOpenNodeRed = () => {
+    // Open Node-RED in a new tab
+    window.open('http://localhost:1880/node-red', '_blank');
+  };
+
   return (
     <Box sx={{ height: '100vh', position: 'relative' }}>
       {/* Header */}
@@ -248,9 +261,18 @@ const WorkflowBuilder: React.FC = () => {
               variant="outlined"
               startIcon={<AIIcon />}
               onClick={handleGetAISuggestions}
-              sx={{ borderColor: '#00d4ff', color: '#00d4ff' }}
+              sx={{ borderColor: '#8b5cf6', color: '#8b5cf6' }}
             >
               AI Suggestions
+            </Button>
+
+            <Button
+              variant="outlined"
+              startIcon={<NodeRedIcon />}
+              onClick={handleOpenNodeRed}
+              sx={{ borderColor: '#ff6b35', color: '#ff6b35' }}
+            >
+              Open Node-RED
             </Button>
             
             <Button
@@ -266,7 +288,7 @@ const WorkflowBuilder: React.FC = () => {
               variant="contained"
               startIcon={<SaveIcon />}
               onClick={() => setSaveDialog(true)}
-              sx={{ backgroundColor: '#00d4ff' }}
+              sx={{ backgroundColor: '#8b5cf6' }}
             >
               Save
             </Button>

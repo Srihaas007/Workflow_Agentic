@@ -100,7 +100,7 @@ const queryClient = new QueryClient({
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false); // Set to false for proper auth flow
+  const [isAuthenticated, setIsAuthenticated] = useState(true); // Bypassing authentication for direct workflow access
 
   const handleSidebarToggle = () => {
     setSidebarOpen(!sidebarOpen);
@@ -155,7 +155,8 @@ function App() {
                 }}
               >
                 <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/" element={<Navigate to="/workflows" replace />} />
+                  <Route path="/login" element={<Navigate to="/workflows" replace />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/workflow-builder" element={<WorkflowBuilder />} />
                   <Route path="/workflows" element={<WorkflowBuilder />} />
@@ -166,7 +167,7 @@ function App() {
                   <Route path="/workflow-advisor" element={<WorkflowAdvisor />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/settings" element={<Settings />} />
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="*" element={<Navigate to="/workflows" replace />} />
                 </Routes>
               </Box>
             </Box>
