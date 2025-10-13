@@ -9,13 +9,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, validates
-from sqlalchemy.sql import func
-from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
+from datetime import datetime
 import re
 import json
 import enum
-from email_validator import validate_email, EmailNotValidError
 
 Base = declarative_base()
 
@@ -244,7 +241,7 @@ class Workflow(Base):
         return name
     
     @validates('nodes', 'edges')
-    def validate_json_fields(self, _key, value):
+    def validate_json_fields(self, key, value):
         """Validate JSON fields"""
         if value is None:
             return [] if key in ['nodes', 'edges', 'tags'] else {}
@@ -252,7 +249,7 @@ class Workflow(Base):
             try:
                 return json.loads(value)
             except json.JSONDecodeError:
-                raise ValueError(f"Invalid JSON format for {_key}") from None
+                raise ValueError(f"Invalid JSON format for {key}") from None
         return value
     
     @property
@@ -374,7 +371,7 @@ class EmailCampaign(Base):
         return subject
     
     @validates('sender_email', 'reply_to')
-    def validate_email_addresses(self, _key, email):
+    def validate_email_addresses(self, key, email):
         if email:
             email = email.lower().strip()
             # Basic email format validation (less strict for demo)
@@ -390,8 +387,8 @@ class EmailCampaign(Base):
         if isinstance(recipients, str):
             try:
                 recipients = json.loads(recipients)
-            except json.JSONDecodeError:
-                raise ValueError("Invalid JSON format for recipients")
+            except json.JSONDecodeError as exc:
+                raise ValueError("Invalid JSON format for recipients") from exc
         
         if not isinstance(recipients, list):
             raise ValueError("Recipients must be a list")
@@ -637,9 +634,8 @@ class APIIntegration(Base):
         return name.strip()
     
     @validates('api_endpoint', 'webhook_url')
-    def validate_urls(self, _key, url):
+    def validate_urls(self, key, url):
         if url and url.strip():
-            import re
             url_pattern = re.compile(
                 r'^https?://'  # http:// or https://
                 r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain...

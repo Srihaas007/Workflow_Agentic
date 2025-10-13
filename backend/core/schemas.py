@@ -8,7 +8,6 @@ from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 from enum import Enum
 import re
-import json
 
 # Base configuration for all schemas
 class BaseSchema(BaseModel):
@@ -76,12 +75,14 @@ class UserCreate(UserBase):
     confirm_password: str = Field(..., description="Password confirmation")
     
     @validator('confirm_password')
-    def passwords_match(cls, v, values, **kwargs):
+    @classmethod
+    def passwords_match(cls, v, values, **_kwargs):
         if 'password' in values and v != values['password']:
             raise ValueError('Passwords do not match')
         return v
     
     @validator('password')
+    @classmethod
     def validate_password_strength(cls, v):
         """Validate password strength"""
         if len(v) < 8:
@@ -151,7 +152,8 @@ class PasswordReset(BaseSchema):
     confirm_password: str = Field(..., description="Confirm new password")
     
     @validator('confirm_password')
-    def passwords_match(cls, v, values, **kwargs):
+    @classmethod
+    def passwords_match(cls, v, values, **_kwargs):
         if 'password' in values and v != values['new_password']:
             raise ValueError('Passwords do not match')
         return v
@@ -177,14 +179,11 @@ class PasswordChangeRequest(BaseSchema):
     confirm_password: str = Field(..., description="Confirm new password")
     
     @validator('confirm_password')
-    def passwords_match(cls, v, values, **kwargs):
+    @classmethod
+    def passwords_match(cls, v, values, **_kwargs):
         if 'new_password' in values and v != values['new_password']:
             raise ValueError('New passwords do not match')
         return v
-
-class PasswordResetRequest(BaseSchema):
-    """Schema for password reset request"""
-    email: EmailStr = Field(..., description="Email address")
 
 class PasswordResetConfirm(BaseSchema):
     """Schema for password reset confirmation"""
@@ -193,7 +192,8 @@ class PasswordResetConfirm(BaseSchema):
     confirm_password: str = Field(..., description="Confirm new password")
     
     @validator('confirm_password')
-    def passwords_match(cls, v, values, **kwargs):
+    @classmethod
+    def passwords_match(cls, v, values, **_kwargs):
         if 'new_password' in values and v != values['new_password']:
             raise ValueError('Passwords do not match')
         return v
@@ -212,6 +212,7 @@ class WorkflowCreate(WorkflowBase):
     edges: List[Dict[str, Any]] = Field(default_factory=list, description="Workflow edges")
     
     @validator('nodes', 'edges')
+    @classmethod
     def validate_workflow_structure(cls, v):
         """Validate workflow structure"""
         if not isinstance(v, list):
@@ -273,6 +274,7 @@ class EmailCampaignCreate(EmailCampaignBase):
     tags: Optional[List[str]] = Field(None, description="Campaign tags")
     
     @validator('recipients')
+    @classmethod
     def validate_recipients(cls, v):
         """Validate recipient list"""
         validated = []
@@ -327,6 +329,7 @@ class ScheduledTaskCreate(ScheduledTaskBase):
     task_data: Dict[str, Any] = Field(default_factory=dict, description="Task configuration")
     
     @validator('schedule_expression')
+    @classmethod
     def validate_cron_expression(cls, v):
         """Basic cron expression validation"""
         parts = v.strip().split()
@@ -373,6 +376,7 @@ class APIIntegrationCreate(APIIntegrationBase):
     configuration: Optional[Dict[str, Any]] = Field(None, description="Service configuration")
     
     @validator('api_endpoint', 'webhook_url')
+    @classmethod
     def validate_urls(cls, v):
         """Validate URL format"""
         if v and v.strip():
@@ -385,7 +389,7 @@ class APIIntegrationCreate(APIIntegrationBase):
                 r'(?:/?|[/?]\S+)$', re.IGNORECASE)
             
             if not url_pattern.match(v.strip()):
-                raise ValueError(f'Invalid URL format')
+                raise ValueError('Invalid URL format')
             return v.strip()
         return v
 

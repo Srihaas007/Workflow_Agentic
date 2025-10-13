@@ -7,15 +7,16 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.exc import IntegrityError
-import hashlib
+from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta
 from typing import Optional
 import re
+import logging
 
-from ..core.database import get_db
-from ..core.models import User
-from ..core.schemas import (
+from backend.core.database import get_db
+from backend.core.models import User, UserRole
+from backend.core.schemas import (
     UserCreate, 
     UserLogin, 
     UserResponse, 
@@ -23,13 +24,19 @@ from ..core.schemas import (
     PasswordResetRequest,
     PasswordReset
 )
-from ..core.config import settings
+from backend.core.config import settings
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["authentication"])
 security = HTTPBearer()
 
+# Password hashing context using bcrypt (secure)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 # JWT Helper Functions
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create JWT access token"""
     to_encode = data.copy()
     if expires_delta:
@@ -41,7 +48,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm="HS256")
     return encoded_jwt
 
-def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
     """Verify JWT token"""
     try:
         payload = jwt.decode(
@@ -57,17 +64,17 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
                 headers={"WWW-Authenticate": "Bearer"},
             )
         return user_id
-    except jwt.PyJWTError:
+    except jwt.PyJWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from exc
 
 async def get_current_user(
     user_id: int = Depends(verify_token),
     db: AsyncSession = Depends(get_db)
-):
+) -> User:
     """Get current authenticated user"""
     result = await db.execute(select(User).filter(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -88,12 +95,12 @@ async def get_current_user(
 
 # Utility Functions
 def hash_password(password: str) -> str:
-    """Hash password using SHA-256"""
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Hash password using bcrypt"""
+    return pwd_context.hash(password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify password against hash"""
-    return hash_password(plain_password) == hashed_password
+    return pwd_context.verify(plain_password, hashed_password)
 
 def validate_email(email: str) -> bool:
     """Validate email format"""
@@ -171,7 +178,7 @@ async def register_user(user_data: UserCreate, db: AsyncSession = Depends(get_db
             hashed_password=hash_password(user_data.password),
             first_name=user_data.first_name,
             last_name=user_data.last_name,
-            role="USER",  # Default role
+            role=UserRole.USER,  # Use enum instead of string
             is_active=True,
             is_verified=False,  # Email verification required
             timezone=user_data.timezone or "UTC",
@@ -182,14 +189,16 @@ async def register_user(user_data: UserCreate, db: AsyncSession = Depends(get_db
         await db.commit()
         await db.refresh(new_user)
         
-        return UserResponse.from_orm(new_user)
+        logger.info("New user registered: %s", user_data.username)
+        return UserResponse.model_validate(new_user)
         
     except IntegrityError as e:
         await db.rollback()
+        logger.error("User registration failed: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User registration failed due to data constraints"
-        )
+        ) from e
 
 @router.post("/login", response_model=Token)
 async def login_user(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
@@ -226,12 +235,14 @@ async def login_user(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
         if user.failed_login_attempts >= 5:
             user.locked_until = datetime.utcnow() + timedelta(minutes=30)
             await db.commit()
+            logger.warning("Account locked for user: %s", user.username)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Account locked due to too many failed login attempts. Try again in 30 minutes."
             )
         
         await db.commit()
+        logger.warning("Failed login attempt for user: %s", user.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
@@ -253,21 +264,22 @@ async def login_user(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
     # Create access token
     access_token_expires = timedelta(hours=24)
     access_token = create_access_token(
-        data={"user_id": user.id, "email": user.email, "role": user.role},
+        data={"user_id": user.id, "email": user.email, "role": user.role.value},
         expires_delta=access_token_expires
     )
     
+    logger.info("Successful login for user: %s", user.username)
     return Token(
         access_token=access_token,
         token_type="bearer",
         expires_in=86400,  # 24 hours in seconds
-        user=UserResponse.from_orm(user)
+        user=UserResponse.model_validate(user)
     )
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
     """Get current user information"""
-    return UserResponse.from_orm(current_user)
+    return UserResponse.model_validate(current_user)
 
 @router.post("/logout")
 async def logout_user():
@@ -277,40 +289,31 @@ async def logout_user():
 @router.post("/forgot-password")
 async def request_password_reset(
     request_data: PasswordResetRequest, 
-    db: AsyncSession = Depends(get_db)
+    _db: AsyncSession = Depends(get_db)  # Prefix with _ to indicate unused
 ):
     """Request password reset"""
     
     # Find user by email
-    result = await db.execute(select(User).filter(User.email == request_data.email))
-    user = result.scalar_one_or_none()
-    
-    if not user:
-        # Don't reveal whether email exists for security
-        return {"message": "If the email exists, a password reset link has been sent"}
-    
-    # In a real application, you would:
+    # Note: In production, you would:
     # 1. Generate a secure reset token
     # 2. Store it in the database with expiration
     # 3. Send email with reset link
     
-    # For now, we'll just return a success message
+    # Don't reveal whether email exists for security
+    logger.info("Password reset requested for email: %s", request_data.email)
     return {"message": "If the email exists, a password reset link has been sent"}
 
 @router.post("/reset-password")
 async def reset_password(
     reset_data: PasswordReset, 
-    db: AsyncSession = Depends(get_db)
+    _db: AsyncSession = Depends(get_db)  # Prefix with _ to indicate unused
 ):
     """Reset user password"""
     
-    # In a real application, you would:
+    # Note: In production, you would:
     # 1. Verify the reset token
     # 2. Check if it's not expired
     # 3. Update the user's password
-    
-    # For now, we'll implement a basic version
-    # This should be enhanced with proper token validation
     
     password_validation = validate_password_strength(reset_data.new_password)
     if not password_validation["is_valid"]:
@@ -327,10 +330,10 @@ async def get_demo_credentials():
     return {
         "admin": {
             "email": "admin@automation-platform.com",
-            "password": "admin123"
+            "password": "Admin123!"
         },
         "user": {
             "email": "user@automation-platform.com", 
-            "password": "user123"
+            "password": "User123!"
         }
     }

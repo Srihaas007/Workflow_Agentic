@@ -5,18 +5,18 @@ import os
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
-from alembic import context
+from alembic import context  # type: ignore
 
 # Add parent directory to path to import our models
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import our models
-from core.models import Base
-from core.config import settings
+from backend.core.models import Base
+from backend.core.config import settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
-config = context.config
+config = context.config  # type: ignore
 
 # Set the database URL from our config
 if not config.get_main_option("sqlalchemy.url"):
@@ -50,15 +50,15 @@ def run_migrations_offline() -> None:
 
     """
     url = config.get_main_option("sqlalchemy.url")
-    context.configure(
+    context.configure(  # type: ignore
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
 
-    with context.begin_transaction():
-        context.run_migrations()
+    with context.begin_transaction():  # type: ignore
+        context.run_migrations()  # type: ignore
 
 
 def run_migrations_online() -> None:
@@ -75,15 +75,15 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
+        context.configure(  # type: ignore
             connection=connection, target_metadata=target_metadata
         )
 
-        with context.begin_transaction():
-            context.run_migrations()
+        with context.begin_transaction():  # type: ignore
+            context.run_migrations()  # type: ignore
 
 
-if context.is_offline_mode():
+if context.is_offline_mode():  # type: ignore
     run_migrations_offline()
 else:
     run_migrations_online()

@@ -46,7 +46,7 @@ class EmailCampaign(BaseModel):
 @router.post("/generate")
 async def generate_email_content(
     request: EmailContentRequest,
-    current_user: dict = Depends(get_current_user)
+    __current_user: dict = Depends(get_current_user)
 ):
     """Generate AI-powered email content"""
     try:
@@ -82,8 +82,8 @@ async def generate_email_content(
 @router.post("/templates")
 async def create_email_template(
     template: EmailTemplate,
-    current_user: dict = Depends(get_current_user),
-    db = Depends(get_db)
+    _current_user: dict = Depends(get_current_user),
+    _db = Depends(get_db)
 ):
     """Create a new email template"""
     try:
@@ -116,8 +116,8 @@ async def create_email_template(
 @router.post("/campaigns")
 async def create_email_campaign(
     campaign: EmailCampaign,
-    background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    _background_tasks: BackgroundTasks,
+    _current_user: dict = Depends(get_current_user)
 ):
     """Create and optionally schedule an email campaign"""
     try:
@@ -162,7 +162,7 @@ async def create_email_campaign(
 @router.get("/campaigns/{campaign_id}/analytics")
 async def get_campaign_analytics(
     campaign_id: str,
-    current_user: dict = Depends(get_current_user)
+    _current_user: dict = Depends(get_current_user)
 ):
     """Get analytics for an email campaign"""
     try:
@@ -215,10 +215,13 @@ async def get_campaign_analytics(
 @router.post("/optimize")
 async def optimize_email_content(
     content: Dict[str, Any],
-    optimization_goals: List[str] = ["engagement", "deliverability"],
-    current_user: dict = Depends(get_current_user)
+    optimization_goals: List[str] = None,
+    _current_user: dict = Depends(get_current_user)
 ):
     """Optimize email content using AI recommendations"""
+    if optimization_goals is None:
+        optimization_goals = ["engagement", "deliverability"]
+    
     try:
         # Get improvement suggestions
         suggestions = await email_ai.get_improvement_suggestions(content)
@@ -274,7 +277,7 @@ async def list_email_templates(
     purpose: Optional[str] = None,
     tone: Optional[str] = None,
     limit: int = 20,
-    current_user: dict = Depends(get_current_user)
+    _current_user: dict = Depends(get_current_user)
 ):
     """List email templates with filtering"""
     try:
@@ -335,7 +338,7 @@ async def list_email_templates(
 @router.get("/insights")
 async def get_email_insights(
     time_period: str = "30d",
-    current_user: dict = Depends(get_current_user)
+    _current_user: dict = Depends(get_current_user)
 ):
     """Get AI-powered email marketing insights"""
     try:

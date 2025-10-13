@@ -3,13 +3,13 @@ Security utilities for authentication and authorization.
 """
 
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from .config import settings
+from backend.core.config import settings
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -50,12 +50,12 @@ class AuthHandler:
                 algorithms=[settings.JWT_ALGORITHM]
             )
             return payload
-        except JWTError:
+        except JWTError as exc:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
                 headers={"WWW-Authenticate": "Bearer"},
-            )
+            ) from exc
 
 # Global auth handler instance
 auth_handler = AuthHandler()
@@ -83,11 +83,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             "permissions": payload.get("permissions", [])
         }
         
-    except Exception as e:
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials"
-        )
+        ) from exc
 
 def create_demo_token() -> str:
     """Create a demo token for testing"""

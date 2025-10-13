@@ -5,6 +5,7 @@ Enhanced database configuration and initialization with proper error handling an
 from sqlalchemy import MetaData, event, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.exc import SQLAlchemyError
 import asyncio
 import logging
 from typing import AsyncGenerator
@@ -109,7 +110,7 @@ async def init_db() -> None:
         # Test the connection
         await test_connection()
         
-    except Exception as e:
+    except (SQLAlchemyError, OSError, ConnectionError) as e:
         logger.error("❌ Database initialization failed: %s", e)
         raise
 
@@ -127,7 +128,7 @@ async def test_connection() -> bool:
             logger.info("✅ Database connection test successful")
             return True
             
-    except Exception as e:
+    except (SQLAlchemyError, OSError, ConnectionError) as e:
         logger.error("❌ Database connection test failed: %s", e)
         return False
 
@@ -140,7 +141,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     try:
         yield session
         await session.commit()
-    except Exception as e:
+    except SQLAlchemyError as e:
         await session.rollback()
         logger.error("Database session error: %s", e)
         raise
@@ -157,7 +158,7 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     try:
         yield session
         await session.commit()
-    except Exception as e:
+    except SQLAlchemyError as e:
         await session.rollback()
         logger.error("Database session error: %s", e)
         raise
@@ -178,7 +179,7 @@ async def close_db() -> None:
     try:
         await engine.dispose()
         logger.info("✅ Database connections closed successfully")
-    except Exception as e:
+    except (SQLAlchemyError, OSError) as e:
         logger.error("❌ Error closing database connections: %s", e)
 
 # Health check function
@@ -207,7 +208,7 @@ async def health_check() -> dict:
             }
         }
         
-    except Exception as e:
+    except (SQLAlchemyError, OSError, ConnectionError) as e:
         logger.error("Database health check failed: %s", e)
         return {
             "status": "unhealthy",
@@ -233,12 +234,12 @@ async def get_db_stats() -> dict:
                 try:
                     result = await session.execute(text(f"SELECT COUNT(*) FROM {table}"))
                     stats[f"{table}_count"] = result.scalar()
-                except Exception:
+                except SQLAlchemyError:
                     stats[f"{table}_count"] = 0
             
             return stats
             
-    except Exception as e:
+    except (SQLAlchemyError, OSError) as e:
         logger.error("Error getting database statistics: %s", e)
         return {"error": str(e)}
 
@@ -248,5 +249,5 @@ async def cleanup_database():
     try:
         await close_db()
         logger.info("🧹 Database cleanup completed")
-    except Exception as e:
+    except (SQLAlchemyError, OSError) as e:
         logger.error("❌ Database cleanup error: %s", e)

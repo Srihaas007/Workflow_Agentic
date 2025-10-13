@@ -5,12 +5,9 @@ This module provides intelligent email content generation, recipient optimizatio
 and engagement tracking inspired by your chatbot communication patterns.
 """
 
-import asyncio
-import json
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any
 from datetime import datetime
 import logging
-import re
 
 logger = logging.getLogger(__name__)
 
@@ -112,9 +109,9 @@ class EmailAI:
             
             return result
             
-        except Exception as e:
-            logger.error(f"Email content generation failed: {e}")
-            return {"error": str(e), "content": []}
+        except Exception as exc:
+            logger.error("Email content generation failed: %s", str(exc))
+            return {"error": str(exc), "content": []}
     
     def _analyze_content_requirements(self, purpose: str, context: Dict[str, Any], tone: str) -> Dict[str, Any]:
         """Analyze content requirements (inspired by your intent recognition patterns)"""
@@ -260,7 +257,7 @@ class EmailAI:
         self, 
         analysis: Dict[str, Any], 
         context: Dict[str, Any], 
-        personalization: Dict[str, Any]
+        _personalization: Dict[str, Any]
     ) -> str:
         """Generate the main email content"""
         
@@ -415,7 +412,7 @@ Event Details:
         
         return subject_suggestions[:5]  # Return top 5 suggestions
     
-    def _analyze_optimal_send_time(self, recipients: List[str], context: Dict[str, Any]) -> Dict[str, Any]:
+    def _analyze_optimal_send_time(self, _recipients: List[str], _context: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze optimal send time for maximum engagement"""
         
         # Default optimal times (this would use ML in production)
@@ -427,7 +424,7 @@ Event Details:
         }
         
         # Analyze context for timing hints
-        urgency = context.get("urgency", "low")
+        urgency = _context.get("urgency", "low")
         if urgency == "high":
             recommendation = "Send immediately"
         else:
@@ -513,8 +510,7 @@ Event Details:
     
     def _get_time_of_day(self) -> str:
         """Get appropriate greeting based on time"""
-        import datetime
-        hour = datetime.datetime.now().hour
+        hour = datetime.now().hour
         
         if 5 <= hour < 12:
             return "morning"

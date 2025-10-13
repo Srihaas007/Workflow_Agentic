@@ -9,20 +9,17 @@ This is the central entry point that combines all five core features:
 5. Workflow Advisor & Analytics
 """
 
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from contextlib import asynccontextmanager
 import asyncio
-from typing import Dict, Any
 import logging
-from decouple import config
 
 # Import our custom modules
 from backend.core.config import settings
 from backend.core.database import init_db
 from backend.api.v1 import api_router
-from backend.core.security import get_current_user
 from backend.ai_engine.workflow_ai import WorkflowAI
 from backend.ai_engine.email_ai import EmailAI
 from backend.ai_engine.scheduler_ai import SchedulerAI
@@ -39,7 +36,7 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer()
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     """Application lifespan events"""
     # Startup
     logger.info("🚀 Starting AI-Powered Automation Platform...")
@@ -70,8 +67,8 @@ async def start_background_services():
         # Start email scheduler
         # Start task optimizer
         logger.info("⚡ Background services started")
-    except Exception as e:
-        logger.error(f"❌ Error starting background services: {e}")
+    except (ImportError, RuntimeError) as e:
+        logger.error("❌ Error starting background services: %s", e)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -137,11 +134,11 @@ async def health_check():
             ]
         }
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
+        logger.error("Health check failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service unhealthy"
-        )
+        ) from e
 
 if __name__ == "__main__":
     import uvicorn
